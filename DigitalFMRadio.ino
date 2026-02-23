@@ -1,110 +1,103 @@
-/*         Arduino Digital FM Radio with build in speakers
-  libraries & schematic: www.ardumotive.com
-       dev: Michalis Vasilakis // Date 24/2/2015 // Version 1.0        
-              Many thanks to nicuflorica.blogspot.ro                       */
+//************* HEADER **************
+/* 
+  Arduino based FM radio using TEA5767 FM module 
+  From instructables and simplified 
+*/
 
-//Libraries:
-#include <SPI.h>
-#include <Adafruit_GFX.h>
-#include <Adafruit_PCD8544.h>
-#include <TEA5767.h>
-#include <Wire.h>
-#include <Button.h>
+//********** LIBRARIES **************
+#include <Wire.h> // I2C comms standard
+#include <TEA5767Radio.h>  // FM module
+#include <Button.h> // push buttons
+#include <Adafruit_GFX.h> // display
+#include <Adafruit_SSD1306.h> // display
 
-//Constants:
-//Adafruit_PCD8544 display = Adafruit_PCD8544(7, 6, 5, 4, 3 ); //Pinout:(SCLK, DIN, DC, CS, RST)
-TEA5767 Radio; //Pinout SLC and SDA - Arduino pins A5 and A4
-Button btn_forward(11, HIGH); //Search station up button
-Button btn_backward(12, HIGH);//Search station down button
+//********** DEFINES ************
+#define SCREEN_WIDTH 128 // OLED display width, in pixels
+#define SCREEN_HEIGHT 64 // OLED  display height, in pixels
 
-//Variables:
-double old_frequency;
-double frequency;
-int search_mode = 0;
-int search_direction;
-unsigned long last_pressed;
-unsigned char buf[5];
-int stereo;
-int signal_level;
-double current_freq;
-unsigned long current_millis = millis();
+//********** GLOBALS ************
+TEA5767Radio radio = TEA5767Radio(); 
+float frequency = 0;  
+char* label = "";
+int i = 0;
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
+float s[] = { 87.7, 92.3, 93.1, 94.5, 95, 97.3, 102.1, 103.3, 104.4, 105.3, 105.7 };
+char* l[] = { "F.Culture", "  FIP", "F.Inter", "Top Music", "F.Musique", "F.Inter", "  RFM", "Europe 1", "F.Info ", "Nostalgie", "  RTL" };
 
-void setup () {
-  //Init
+int DOWN = 12; // pin 12, button down
+int UP = 11; // pin 11, button up
+int downState = 0;
+int upState = 0;
+
+//************** SETUP ********************
+void setup() {
+  Serial.begin(9600);
+  Serial.println("==== INIT RADIO ====");
+  delay(1000);
   Wire.begin();
-  Radio.init();
-  Radio.set_frequency(95.2); //On power on go to station 95.2
+  frequency = s[i]; // frequency
+  label = l[i]; // label
+  radio.setFrequency(frequency);
 
-  Serial.begin(250000);
+  Serial.println("==== INIT BUTTONS ====");
+  delay(1000);
+  pinMode(UP, INPUT); 
+  pinMode(DOWN, INPUT); 
+
+  if(!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) { // Address 0x3D for 128x64
+    Serial.println(F("SSD1306 allocation failed"));
+    for(;;);
+  }
+  displayUpdate();
 
 }
 
-void loop () {
-  Radio.set_frequency(95.2); //On power on go to station 95.2
-
-  LogNow("loop : 0");
-
-  if (Radio.read_status(buf) == 1) {
-    LogNow("loop : 1");
-
-    current_freq =  floor (Radio.frequency_available (buf) / 100000 + .5) / 10;
-    stereo = Radio.stereo(buf);
-    signal_level = Radio.signal_level(buf);
-      }
-
-  //When button pressed, search for new station
-  if (search_mode == 1) {
-        LogNow("loop : 2");
-
-      if (Radio.process_search (buf, search_direction) == 1) {
-        LogNow("loop : 3");
-
-          search_mode = 0;
-      }
-  }
-  //If forward button is pressed, go up to next station
-  if (btn_forward.isPressed()) {
-    LogNow("loop : 4");
-
-    last_pressed = current_millis;
-    search_mode = 1;
-    search_direction = TEA5767_SEARCH_DIR_UP;
-    Radio.search_up(buf);
-    delay(1000);
-  }
-  //If backward button is pressed, go down to next station
-  if (btn_backward.isPressed()) {
-    LogNow("loop : 5");
+//*************** LOOP ********************
+void loop() {
+  downState = digitalRead(DOWN);
+  if ( downState == LOW ) { // go up to next station
+    Serial.println("==== Button DOWN pressed ====");
+    i --;
+    if (i < 0) { 
+      i = 10;
+    }
+    delay(200);
+    frequencyUpdate();
     
-    last_pressed = current_millis;
-    search_mode = 1;
-    search_direction = TEA5767_SEARCH_DIR_DOWN;
-    Radio.search_down(buf);
-    delay(1000);
-  } 
-   delay(100);
+  }
 
-} 
+  //upState = digitalRead(UP);
+  //if ( upState == HIGH ) { // go up to next station
+  //  Serial.println("==== Button UP pressed ====");
+  //  i ++;
+  //  if (i > 10) { 
+  //    i = 0;
+  //  }
+  //  delay(200);
+  //  frequencyUpdate();
 
-void LogNow (String msg) {
-    // Inform the user
-    Serial.println(msg);
-    Serial.print("read_status : ");
-    Serial.println(Radio.read_status(buf));
+  //}
+}
 
-    Serial.print("stereo : ");
-    Serial.println(Radio.stereo(buf));
+void frequencyUpdate() { // UP or DOWN frequency
+  frequency = s[i];
+  label = l[i];
+  radio.setFrequency(frequency);
+  displayUpdate();
 
-    Serial.print("signal_level : ");
-    Serial.println(Radio.signal_level(buf));
+}
 
-    Serial.print("frequency_available : ");
-    Serial.println(Radio.frequency_available(buf));
+void displayUpdate() { // LCD display update
+  // set 
+  delay(10);
+  display.clearDisplay();
+  display.setTextColor(WHITE);
+  display.setTextSize(2);
+  display.setCursor(10, 25);
 
-    Serial.print("current_freq : ");
-    current_freq =  floor (Radio.frequency_available (buf) / 100000 + .5) / 10;
-    Serial.println(current_freq);
-
-    delay(2000);
-
-} 
+  // and display
+  display.println(label);
+  display.display(); 
+  delay(1000);
+  
+}
