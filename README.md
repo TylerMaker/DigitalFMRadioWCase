@@ -1,7 +1,7 @@
 # Digital FM Radio #
 
 Check details and steps on Instructables :
-https://www.instructables.com/member/TylerDDDD/instructables/
+[https://www.instructables.com/member/TylerDDDD/instructables/](https://www.instructables.com/-DIY-Digital-FM-Radio-With-Arduino-3D-Printed-Case/)
 
 Important : before uploading the .ino file to your Arduino Uno, adjust the FM radio frequencies to your location.
 
